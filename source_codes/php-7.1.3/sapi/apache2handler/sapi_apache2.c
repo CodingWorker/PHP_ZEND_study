@@ -66,71 +66,79 @@
 /* if apache's version is newer than 2.2.31 or 2.4.16 */
 #if MODULE_MAGIC_COOKIE == 0x41503232UL && AP_MODULE_MAGIC_AT_LEAST(20051115,40) || \
 	MODULE_MAGIC_COOKIE == 0x41503234UL && AP_MODULE_MAGIC_AT_LEAST(20120211,47)
+
+//将php_ap_map_http_request_error定义为ap_map_http_request_error，以方便在这里通用
 #define php_ap_map_http_request_error ap_map_http_request_error
 #else
+
+//请求状态处理
 static int php_ap_map_http_request_error(apr_status_t rv, int status)
 {
 	switch (rv) {
-	case AP_FILTER_ERROR: {
-		return AP_FILTER_ERROR;
-	}
-	case APR_ENOSPC: {
-		return HTTP_REQUEST_ENTITY_TOO_LARGE;
-	}
-	case APR_ENOTIMPL: {
-		return HTTP_NOT_IMPLEMENTED;
-	}
-	case APR_ETIMEDOUT: {
-		return HTTP_REQUEST_TIME_OUT;
-	}
-	default: {
-		return status;
-	}
+        case AP_FILTER_ERROR: {  //apache过滤错误
+            return AP_FILTER_ERROR;
+        }
+        case APR_ENOSPC: {   //设备上没有剩余空间
+            return HTTP_REQUEST_ENTITY_TOO_LARGE;
+        }
+        case APR_ENOTIMPL: {  //apcahe为实现错误
+            return HTTP_NOT_IMPLEMENTED;
+        }
+        case APR_ETIMEDOUT: {  //请求处理超时错误
+            return HTTP_REQUEST_TIME_OUT;
+        }
+        default: {
+            return status;    //正常返回状态码
+        }
 	}
 }
 #endif
 
-/* A way to specify the location of the php.ini dir in an apache directive */
+/* A way to specify the location of the php.ini dir in an apache directive
+* 在apaceh指令中可以特定的指定php.ini文件所在的位置
+*/
 char *apache2_php_ini_path_override = NULL;
 #if defined(PHP_WIN32) && defined(ZTS)
-ZEND_TSRMLS_CACHE_DEFINE()
+    ZEND_TSRMLS_CACHE_DEFINE()
 #endif
 
+//apache 的PHP模块写操作
 static size_t
 php_apache_sapi_ub_write(const char *str, size_t str_length)
 {
-	request_rec *r;
-	php_struct *ctx;
+	request_rec *r;  //请求
+	php_struct *ctx;  //context
 
 	ctx = SG(server_context);
 	r = ctx->r;
 
 	if (ap_rwrite(str, str_length, r) < 0) {
-		php_handle_aborted_connection();
+		php_handle_aborted_connection();    //处理退出连接异常
 	}
 
 	return str_length; /* we always consume all the data passed to us. */
 }
 
+//apaceh_php模块处理header请求，返回处理成功与否或者处理类型
 static int
 php_apache_sapi_header_handler(sapi_header_struct *sapi_header, sapi_header_op_enum op, sapi_headers_struct *sapi_headers)
 {
-	php_struct *ctx;
+	php_struct *ctx;  //context-上下文
 	char *val, *ptr;
 
 	ctx = SG(server_context);
 
-	switch (op) {
-		case SAPI_HEADER_DELETE:
+	switch (op) {  //header-选项
+		case SAPI_HEADER_DELETE:   //从所有响应头中delete传入的header项
 			apr_table_unset(ctx->r->headers_out, sapi_header->header);
 			return 0;
 
-		case SAPI_HEADER_DELETE_ALL:
+		case SAPI_HEADER_DELETE_ALL:  //清空所有响应头
 			apr_table_clear(ctx->r->headers_out);
 			return 0;
 
-		case SAPI_HEADER_ADD:
-		case SAPI_HEADER_REPLACE:
+		case SAPI_HEADER_ADD: //添加header，如：ContentType:html
+		case SAPI_HEADER_REPLACE:  //替换header
 			val = strchr(sapi_header->header, ':');
 
 			if (!val) {
@@ -146,9 +154,9 @@ php_apache_sapi_header_handler(sapi_header_struct *sapi_header, sapi_header_op_e
 
 			if (!strcasecmp(sapi_header->header, "content-type")) {
 				if (ctx->content_type) {
-					efree(ctx->content_type);
+					efree(ctx->content_type);  //释放
 				}
-				ctx->content_type = estrdup(val);
+				ctx->content_type = estrdup(val); //添加header:content-type
 			} else if (!strcasecmp(sapi_header->header, "content-length")) {
 				apr_off_t clen = 0;
 
@@ -158,10 +166,10 @@ php_apache_sapi_header_handler(sapi_header_struct *sapi_header, sapi_header_op_e
 					clen = (apr_off_t) strtol(val, (char **) NULL, 10);
 				}
 
-				ap_set_content_length(ctx->r, clen);
-			} else if (op == SAPI_HEADER_REPLACE) {
+				ap_set_content_length(ctx->r, clen);  //set the header:content-length
+			} else if (op == SAPI_HEADER_REPLACE) {  //其他header选项替换
 				apr_table_set(ctx->r->headers_out, sapi_header->header, val);
-			} else {
+			} else {  //其他header选项添加
 				apr_table_add(ctx->r->headers_out, sapi_header->header, val);
 			}
 
@@ -174,19 +182,23 @@ php_apache_sapi_header_handler(sapi_header_struct *sapi_header, sapi_header_op_e
 	}
 }
 
+
+//apache_php模块处理响应header
 static int
 php_apache_sapi_send_headers(sapi_headers_struct *sapi_headers)
 {
-	php_struct *ctx = SG(server_context);
+	php_struct *ctx = SG(server_context); //context-上下文
 	const char *sline = SG(sapi_headers).http_status_line;
 
-	ctx->r->status = SG(sapi_headers).http_response_code;
+	ctx->r->status = SG(sapi_headers).http_response_code; //响应状态码
 
 	/* httpd requires that r->status_line is set to the first digit of
 	 * the status-code: */
 	if (sline && strlen(sline) > 12 && strncmp(sline, "HTTP/1.", 7) == 0 && sline[8] == ' ') {
-		ctx->r->status_line = apr_pstrdup(ctx->r->pool, sline + 9);
-		ctx->r->proto_num = 1000 + (sline[7]-'0');
+		ctx->r->status_line = apr_pstrdup(ctx->r->pool, sline + 9);//如：sline：HTTP/1.0 200
+
+		ctx->r->proto_num = 1000 + (sline[7]-'0');//协议号
+
 		if ((sline[7]-'0') == 0) {
 			apr_table_set(ctx->r->subprocess_env, "force-response-1.0", "true");
 		}
@@ -194,16 +206,19 @@ php_apache_sapi_send_headers(sapi_headers_struct *sapi_headers)
 
 	/*	call ap_set_content_type only once, else each time we call it,
 		configured output filters for that content type will be added */
-	if (!ctx->content_type) {
+	if (!ctx->content_type) {  //header的content-type 为null，use the default
 		ctx->content_type = sapi_get_default_content_type();
 	}
+
+	//设置content-type
 	ap_set_content_type(ctx->r, apr_pstrdup(ctx->r->pool, ctx->content_type));
 	efree(ctx->content_type);
 	ctx->content_type = NULL;
 
-	return SAPI_HEADER_SENT_SUCCESSFULLY;
+	return SAPI_HEADER_SENT_SUCCESSFULLY;  //返回同步发送成功
 }
 
+//读取post请求数据
 static apr_size_t
 php_apache_sapi_read_post(char *buf, size_t count_bytes)
 {
@@ -425,6 +440,7 @@ static int php_apache2_startup(sapi_module_struct *sapi_module)
 	return SUCCESS;
 }
 
+//apache 服务抽象层接口实现，sapi_module_struct定义在SAPI.h
 static sapi_module_struct apache2_sapi_module = {
 	"apache2handler",
 	"Apache 2.0 Handler",

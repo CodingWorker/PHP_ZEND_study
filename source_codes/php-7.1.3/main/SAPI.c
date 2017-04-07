@@ -301,7 +301,7 @@ SAPI_API SAPI_POST_READER_FUNC(sapi_read_standard_form_data)
 	}
 }
 
-
+//获取默认的header:content-type
 static inline char *get_default_content_type(uint prefix_len, uint *len)
 {
 	char *mimetype, *charset, *content_type;

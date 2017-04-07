@@ -1734,6 +1734,7 @@ int php_request_startup_for_hook(void)
 /* }}} */
 
 /* {{{ php_request_shutdown_for_exec
+* //HP关闭请求
  */
 void php_request_shutdown_for_exec(void *dummy)
 {
@@ -1800,6 +1801,7 @@ void php_request_shutdown_for_hook(void *dummy)
 /* }}} */
 
 /* {{{ php_request_shutdown
+* PHP请求关闭操作:若干个关闭操作的集合
  */
 void php_request_shutdown(void *dummy)
 {
@@ -1814,17 +1816,23 @@ void php_request_shutdown(void *dummy)
 
 	php_deactivate_ticks();
 
-	/* 1. Call all possible shutdown functions registered with register_shutdown_function() */
+	/* 1. Call all possible shutdown functions registered with register_shutdown_function()
+	 * 关闭所有通过函数register_shutdown_function()注册的函数
+	 */
 	if (PG(modules_activated)) zend_try {
 		php_call_shutdown_functions();
 	} zend_end_try();
 
-	/* 2. Call all possible __destruct() functions */
+	/* 2. Call all possible __destruct() functions
+	* 调用所有的析构函数
+	*/
 	zend_try {
 		zend_call_destructors();
 	} zend_end_try();
 
-	/* 3. Flush all output buffers */
+	/* 3. Flush all output buffers
+	* 刷出所有的输出
+	*/
 	zend_try {
 		zend_bool send_buffer = SG(request_info).headers_only ? 0 : 1;
 
@@ -1841,27 +1849,37 @@ void php_request_shutdown(void *dummy)
 		}
 	} zend_end_try();
 
-	/* 4. Reset max_execution_time (no longer executing php code after response sent) */
+	/* 4. Reset max_execution_time (no longer executing php code after response sent)
+	* 重置最大执行时间（在请求发送后不会执行任何的PHP代码）
+	*/
 	zend_try {
 		zend_unset_timeout();
 	} zend_end_try();
 
-	/* 5. Call all extensions RSHUTDOWN functions */
+	/* 5. Call all extensions RSHUTDOWN functions
+	* 调用所有扩展的RSHUTDOWN函数
+	*/
 	if (PG(modules_activated)) {
 		zend_deactivate_modules();
 	}
 
-	/* 6. Shutdown output layer (send the set HTTP headers, cleanup output handlers, etc.) */
+	/* 6. Shutdown output layer (send the set HTTP headers, cleanup output handlers, etc.)
+	* 关闭所有的输出层（发送设置http头，清理所有的处理操作）
+	*/
 	zend_try {
 		php_output_deactivate();
 	} zend_end_try();
 
-	/* 7. Free shutdown functions */
+	/* 7. Free shutdown functions
+	* 释放shutdown函数
+	*/
 	if (PG(modules_activated)) {
 		php_free_shutdown_functions();
 	}
 
-	/* 8. Destroy super-globals */
+	/* 8. Destroy super-globals
+	* 释放超全局变量
+	*/
 	zend_try {
 		int i;
 
@@ -1870,37 +1888,53 @@ void php_request_shutdown(void *dummy)
 		}
 	} zend_end_try();
 
-	/* 9. free request-bound globals */
+	/* 9. free request-bound globals
+	* 释放请求绑定全局变量
+	*/
 	php_free_request_globals();
 
-	/* 10. Shutdown scanner/executor/compiler and restore ini entries */
+	/* 10. Shutdown scanner/executor/compiler and restore ini entries
+	* 关闭scanner、executor、compiler和存储ini属性
+	*/
 	zend_deactivate();
 
-	/* 11. Call all extensions post-RSHUTDOWN functions */
+	/* 11. Call all extensions post-RSHUTDOWN functions
+	* 调用所有扩展的post-RSHUTDOWN函数
+	*/
 	zend_try {
 		zend_post_deactivate_modules();
 	} zend_end_try();
 
-	/* 12. SAPI related shutdown (free stuff) */
+	/* 12. SAPI related shutdown (free stuff)
+	* SAPI相关资源关闭（释放）
+	*/
 	zend_try {
 		sapi_deactivate();
 	} zend_end_try();
 
-	/* 13. free virtual CWD memory */
+	/* 13. free virtual CWD memory
+	* 释放虚拟的CWD内存
+	*/
 	virtual_cwd_deactivate();
 
-	/* 14. Destroy stream hashes */
+	/* 14. Destroy stream hashes
+	* 释放流hash变量
+	*/
 	zend_try {
 		php_shutdown_stream_hashes();
 	} zend_end_try();
 
-	/* 15. Free Willy (here be crashes) */
+	/* 15. Free Willy (here be crashes)
+	* 释放崩溃
+	*/
 	zend_interned_strings_restore();
 	zend_try {
 		shutdown_memory_manager(CG(unclean_shutdown) || !report_memleaks, 0);
 	} zend_end_try();
 
-	/* 16. Reset max_execution_time */
+	/* 16. Reset max_execution_time
+	* 重置最大执行时间
+	*/
 	zend_try {
 		zend_unset_timeout();
 	} zend_end_try();
@@ -1915,7 +1949,7 @@ void php_request_shutdown(void *dummy)
 #ifdef HAVE_DTRACE
 	DTRACE_REQUEST_SHUTDOWN(SAFE_FILENAME(SG(request_info).path_translated), SAFE_FILENAME(SG(request_info).request_uri), (char *)SAFE_FILENAME(SG(request_info).request_method));
 #endif /* HAVE_DTRACE */
-}
+}//请求关闭完成
 /* }}} */
 
 /* {{{ php_com_initialize
@@ -2405,8 +2439,10 @@ void php_module_shutdown(void)
 	php_win32_free_rng_lock();
 #endif
 
+    //将执行的最终执行内容刷出去
 	sapi_flush();
 
+    //关闭zend引擎
 	zend_shutdown();
 
 	/* Destroys filter & transport registries too */

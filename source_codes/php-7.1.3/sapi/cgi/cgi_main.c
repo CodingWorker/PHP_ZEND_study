@@ -928,6 +928,8 @@ static int php_cgi_startup(sapi_module_struct *sapi_module)
 }
 
 /* {{{ sapi_module_struct cgi_sapi_module
+* sapi_module_struct结构类型 cgi_sapi_module结构实现，即cgi服务的实现
+* sapi_module_struct结构类型，定义在SAPI.h
  */
 static sapi_module_struct cgi_sapi_module = {
 	"cgi-fcgi",						/* name */

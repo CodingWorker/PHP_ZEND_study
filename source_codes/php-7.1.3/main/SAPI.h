@@ -216,6 +216,10 @@ SAPI_API double sapi_get_request_time(void);
 SAPI_API void sapi_terminate_process(void);
 END_EXTERN_C()
 
+
+//实现SAPI接口的结构变量，定义一些服务相关的方法，然后这些方法在各个服务器
+//抽象层实现时都会有个各自的实现；类似OOP中的Interface,基本的调用：
+//上层调用-->SAPI-->各个服务实现(eg. fastcgi,apache,cli .etc)
 struct _sapi_module_struct {
 	char *name;
 	char *pretty_name;
