@@ -2261,7 +2261,7 @@ int php_module_startup(sapi_module_struct *sf, zend_module_entry *additional_mod
 	 */
 	php_ini_register_extensions();
 
-	//
+	//模块初始化
 	zend_startup_modules();
 
 	/* start Zend extensions */
