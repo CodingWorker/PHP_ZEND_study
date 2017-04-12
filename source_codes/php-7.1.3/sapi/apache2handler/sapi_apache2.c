@@ -224,8 +224,8 @@ php_apache_sapi_read_post(char *buf, size_t count_bytes)
 {
 	apr_size_t len, tlen=0;
 	php_struct *ctx = SG(server_context);
-	request_rec *r;
-	apr_bucket_brigade *brigade;
+	request_rec *r; //请求
+	apr_bucket_brigade *brigade;//brigade:把...编成队
 	apr_status_t ret;
 
 	r = ctx->r;
