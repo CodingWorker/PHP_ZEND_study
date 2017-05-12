@@ -182,7 +182,6 @@ php_apache_sapi_header_handler(sapi_header_struct *sapi_header, sapi_header_op_e
 	}
 }
 
-
 //apache_php模块处理响应header
 static int
 php_apache_sapi_send_headers(sapi_headers_struct *sapi_headers)
